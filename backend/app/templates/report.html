@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security Scan Report - {{ target.name }}</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.6; color: #333; max-width: 1200px; margin: 0 auto; padding: 20px; }
+        h1, h2, h3 { color: #2c3e50; }
+        .header { border-bottom: 2px solid #eee; padding-bottom: 20px; margin-bottom: 30px; }
+        .meta { color: #666; font-size: 0.9em; }
+        .summary { display: flex; gap: 20px; margin-bottom: 40px; }
+        .card { background: #f8f9fa; padding: 20px; border-radius: 8px; flex: 1; text-align: center; }
+        .card h3 { margin: 0 0 10px 0; font-size: 1.2em; }
+        .card .number { font-size: 2.5em; font-weight: bold; color: #3498db; }
+        .severity-high { color: #e74c3c; }
+        .severity-medium { color: #e67e22; }
+        .severity-low { color: #f1c40f; }
+        .finding { border: 1px solid #ddd; border-radius: 8px; margin-bottom: 20px; overflow: hidden; }
+        .finding-header { background: #f8f9fa; padding: 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd; }
+        .finding-body { padding: 20px; }
+        .badge { padding: 4px 8px; border-radius: 4px; font-size: 0.8em; font-weight: bold; color: white; }
+        .bg-High { background-color: #e74c3c; }
+        .bg-Medium { background-color: #e67e22; }
+        .bg-Low { background-color: #f1c40f; }
+        .bg-Informational { background-color: #3498db; }
+        .bg-Info { background-color: #3498db; }
+        code { background: #f4f4f4; padding: 2px 5px; border-radius: 3px; font-family: monospace; }
+        pre { background: #f4f4f4; padding: 10px; border-radius: 5px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Security Scan Report</h1>
+        <div class="meta">
+            <p><strong>Target:</strong> {{ target.name }} ({{ target.base_url }})</p>
+            <p><strong>Scan ID:</strong> {{ scan.id }}</p>
+            <p><strong>Date:</strong> {{ scan.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+            <p><strong>Status:</strong> {{ scan.status }}</p>
+        </div>
+    </div>
+
+    <div class="summary">
+        <div class="card">
+            <h3>Total Findings</h3>
+            <div class="number">{{ findings|length }}</div>
+        </div>
+        <div class="card">
+            <h3>High Risk</h3>
+            <div class="number severity-high">{{ findings|selectattr('severity', 'equalto', 'High')|list|length }}</div>
+        </div>
+        <div class="card">
+            <h3>Medium Risk</h3>
+            <div class="number severity-medium">{{ findings|selectattr('severity', 'equalto', 'Medium')|list|length }}</div>
+        </div>
+    </div>
+
+    <h2>Detailed Findings</h2>
+    
+    {% for finding in findings %}
+    <div class="finding">
+        <div class="finding-header">
+            <h3>{{ finding.title }}</h3>
+            <span class="badge bg-{{ finding.severity }}">{{ finding.severity }}</span>
+        </div>
+        <div class="finding-body">
+            <p><strong>Endpoint:</strong> <code>{{ finding.endpoint_url }}</code></p>
+            <p><strong>Risk Score:</strong> {{ finding.risk_score }}</p>
+            <p><strong>Confidence:</strong> {{ finding.confidence }}</p>
+            
+            <h4>Description</h4>
+            <p>{{ finding.description }}</p>
+            
+            {% if finding.solution %}
+            <h4>Solution</h4>
+            <p>{{ finding.solution }}</p>
+            {% endif %}
+
+            {% if finding.cwe_id %}
+            <p class="meta">CWE-{{ finding.cwe_id }} | WASC-{{ finding.wasc_id }}</p>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+    
+    {% if findings|length == 0 %}
+    <p>No vulnerabilities found. Great job!</p>
+    {% endif %}
+
+</body>
+</html>

@@ -1,0 +1,46 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  schedule:
+    - cron: '0 0 * * *'  # Daily at midnight
+
+permissions:
+  contents: read
+
+jobs:
+  autoappsec-scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+        
+    - name: Install AutoAppSec CLI
+      run: |
+        python -m pip install --upgrade pip
+        # Install from local source
+        pip install typer rich shellingham requests
+        # In real scenario, pip install autoappsec-cli
+        
+    - name: Run Security Scan
+      env:
+        AUTOAPPSEC_API_KEY: ${{ secrets.AUTOAPPSEC_API_KEY }}
+        AUTOAPPSEC_API_URL: ${{ secrets.AUTOAPPSEC_API_URL }} # e.g. https://scanner.example.com
+      run: |
+        # Ensure backend module is in path
+        export PYTHONPATH=$PYTHONPATH:.
+        
+        # Run scan against staging or production
+        python -m backend.cli.main scan run http://staging.example.com --profile quick --wait
+        
+    - name: Check Status
+      if: failure()
+      run: echo "Security scan failed or found critical vulnerabilities!"
