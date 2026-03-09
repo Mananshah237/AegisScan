@@ -4,6 +4,18 @@ from typing import List, Dict, Any, Generator
 
 logger = logging.getLogger(__name__)
 
+_SEVERITY_MAP = {
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low",
+    "informational": "Info",
+    "info": "Info",
+}
+
+def _map_severity(riskdesc: str) -> str:
+    raw = riskdesc.split(" ")[0].lower() if riskdesc else "info"
+    return _SEVERITY_MAP.get(raw, "Info")
+
 def parse_zap_json(file_path: str) -> Generator[Dict[str, Any], None, None]:
     """
     Parses a ZAP JSON report and yields normalized finding dictionaries.
@@ -26,7 +38,7 @@ def parse_zap_json(file_path: str) -> Generator[Dict[str, Any], None, None]:
                     "title": alert.get('alert', 'Unknown Alert'),
                     "description": alert.get('desc', ''),
                     "solution": alert.get('solution', ''),
-                    "severity": alert.get('riskdesc', '').split(' ')[0] if alert.get('riskdesc') else 'Info',
+                    "severity": _map_severity(alert.get('riskdesc', '')),
                     "confidence": alert.get('confidence', 'Low'),
                     "risk_score": 0.0, # To be calculated
                     "cwe_id": int(alert.get('cweid', 0)),

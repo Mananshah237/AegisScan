@@ -16,5 +16,5 @@ class Target(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
 
-    owner: Mapped["User"] = relationship("app.models.user.User", back_populates="targets")
+    owner: Mapped["User"] = relationship("User", back_populates="targets")
     scans: Mapped[List["Scan"]] = relationship("Scan", back_populates="target", cascade="all, delete-orphan")

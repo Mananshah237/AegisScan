@@ -8,10 +8,21 @@ from app.api import deps
 from app.db.session import get_db
 from app.models.user import User
 from app.models.scan import Scan, ScanStatus
+from app.models.target import Target
 from app.schemas.scan import ScanCreate, ScanRead
 from app.tasks.scan import run_scan_task
 
 router = APIRouter()
+
+@router.get("/", response_model=List[ScanRead])
+async def list_scans(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(deps.get_current_active_user),
+) -> Any:
+    result = await db.execute(
+        select(Scan).join(Target).where(Target.user_id == current_user.id)
+    )
+    return result.scalars().all()
 
 @router.post("/", response_model=ScanRead)
 async def create_scan(
@@ -23,9 +34,6 @@ async def create_scan(
     """
     Create a new scan and start it.
     """
-    # Verify ownership of target is done by ownership or just existence?
-    # Better to verify target belongs to user
-    from app.models.target import Target
     result = await db.execute(select(Target).where(Target.id == scan_in.target_id, Target.user_id == current_user.id))
     target = result.scalars().first()
     if not target:

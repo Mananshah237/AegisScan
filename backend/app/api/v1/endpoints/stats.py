@@ -7,7 +7,7 @@ import datetime
 from app.api import deps
 from app.db.session import get_db
 from app.models.user import User
-from app.models.scan import Scan, Finding
+from app.models.scan import Scan, Finding, Severity
 from app.models.target import Target
 
 router = APIRouter()
@@ -48,8 +48,8 @@ async def get_dashboard_stats(
     for scan in reversed(last_scans): # Oldest first for chart
         # Count findings
         # This is N+1, but limit is 5, so valid.
-        high = (await db.execute(select(func.count(Finding.id)).where(Finding.scan_id == scan.id, Finding.severity == 'High'))).scalar() or 0
-        medium = (await db.execute(select(func.count(Finding.id)).where(Finding.scan_id == scan.id, Finding.severity == 'Medium'))).scalar() or 0
+        high = (await db.execute(select(func.count(Finding.id)).where(Finding.scan_id == scan.id, Finding.severity == Severity.HIGH))).scalar() or 0
+        medium = (await db.execute(select(func.count(Finding.id)).where(Finding.scan_id == scan.id, Finding.severity == Severity.MEDIUM))).scalar() or 0
         
         chart_data.append({
             "date": scan.created_at.strftime("%m-%d %H:%M"),

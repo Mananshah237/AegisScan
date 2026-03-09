@@ -41,6 +41,9 @@ def get_api_key() -> str:
     env_key = os.getenv("AUTOAPPSEC_API_KEY")
     if env_key:
         return env_key
+    if "AUTOAPPSEC_API_KEY" in os.environ:
+        console.print("[red]AUTOAPPSEC_API_KEY is set but empty. Check your CI secrets configuration.[/red]")
+        raise typer.Exit(code=1)
     config = load_config()
     return config.get("api_key", "")
 
@@ -48,5 +51,8 @@ def get_api_url() -> str:
     env_url = os.getenv("AUTOAPPSEC_API_URL")
     if env_url:
         return env_url
+    if "AUTOAPPSEC_API_URL" in os.environ:
+        console.print("[red]AUTOAPPSEC_API_URL is set but empty. Check your CI secrets configuration.[/red]")
+        raise typer.Exit(code=1)
     config = load_config()
     return config.get("api_url", "http://localhost:8000")

@@ -7,6 +7,25 @@ on:
     branches: [ "main" ]
   schedule:
     - cron: '0 0 * * *'  # Daily at midnight
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: 'URL to scan'
+        required: true
+      api_url:
+        description: 'AegisScan API URL'
+        required: true
+      api_key:
+        description: 'AegisScan API key'
+        required: true
+      profile:
+        description: 'Scan profile'
+        required: false
+        default: 'quick'
+        type: choice
+        options:
+          - quick
+          - full
 
 permissions:
   contents: read
@@ -31,15 +50,13 @@ jobs:
         # In real scenario, pip install autoappsec-cli
         
     - name: Run Security Scan
-      env:
-        AUTOAPPSEC_API_KEY: ${{ secrets.AUTOAPPSEC_API_KEY }}
-        AUTOAPPSEC_API_URL: ${{ secrets.AUTOAPPSEC_API_URL }} # e.g. https://scanner.example.com
       run: |
-        # Ensure backend module is in path
         export PYTHONPATH=$PYTHONPATH:.
-        
-        # Run scan against staging or production
-        python -m backend.cli.main scan run http://staging.example.com --profile quick --wait
+        python -m backend.cli.main scan run ${{ inputs.target_url }} \
+          --profile ${{ inputs.profile || 'quick' }} \
+          --api-url ${{ inputs.api_url }} \
+          --api-key ${{ inputs.api_key }} \
+          --wait
         
     - name: Check Status
       if: failure()

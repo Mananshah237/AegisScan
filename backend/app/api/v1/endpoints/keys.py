@@ -1,4 +1,5 @@
 from typing import Any, List
+import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -50,7 +51,7 @@ async def list_api_keys(
 
 @router.delete("/{key_id}")
 async def revoke_api_key(
-    key_id: str,
+    key_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(deps.get_current_active_user),
 ) -> Any:

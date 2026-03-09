@@ -1,6 +1,7 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from sqlalchemy import String, DateTime, ForeignKey, Integer, Float, Text, Enum
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 from app.db.session import Base
@@ -36,7 +37,7 @@ class Scan(Base):
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    target: Mapped["Target"] = relationship("app.models.target.Target", back_populates="scans")
+    target: Mapped["Target"] = relationship("Target", back_populates="scans")
     findings: Mapped[List["Finding"]] = relationship("Finding", back_populates="scan", cascade="all, delete-orphan")
     artifacts: Mapped[List["Artifact"]] = relationship("Artifact", back_populates="scan", cascade="all, delete-orphan")
 
@@ -60,7 +61,12 @@ class Finding(Base):
     evidence: Mapped[Optional[str]] = mapped_column(Text)
     
     fingerprint: Mapped[str] = mapped_column(String, index=True) # For cross-scan dedupe
-    
+
+    cwe_id: Mapped[Optional[str]] = mapped_column(String)
+    wasc_id: Mapped[Optional[str]] = mapped_column(String)
+    cvss_vector: Mapped[Optional[str]] = mapped_column(String)
+    finding_meta: Mapped[Optional[Dict]] = mapped_column(JSONB)
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     scan: Mapped["Scan"] = relationship("Scan", back_populates="findings")

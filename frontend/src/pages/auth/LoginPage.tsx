@@ -28,13 +28,11 @@ export default function LoginPage() {
         setLoading(true);
         setError('');
         try {
-            const formData = new FormData();
-            formData.append('username', data.username);
-            formData.append('password', data.password);
+            const params = new URLSearchParams();
+            params.append('username', data.username);
+            params.append('password', data.password);
 
-            const response = await api.post('/auth/access-token', formData, {
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-            });
+            const response = await api.post('/auth/access-token', params);
 
             login(response.data.access_token, response.data.refresh_token);
             navigate('/dashboard');

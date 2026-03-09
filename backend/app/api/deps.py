@@ -1,4 +1,5 @@
 from typing import Generator, Optional
+import uuid
 from fastapi import Depends, HTTPException, status, Security
 from fastapi.security import OAuth2PasswordBearer, APIKeyHeader
 from jose import jwt, JWTError
@@ -32,8 +33,11 @@ async def get_current_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Could not validate credentials",
         )
-    
-    result = await db.execute(select(User).where(User.id == token_data.sub))
+
+    if token_data.sub is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Could not validate credentials")
+
+    result = await db.execute(select(User).where(User.id == uuid.UUID(token_data.sub)))
     user = result.scalars().first()
     
     if not user:

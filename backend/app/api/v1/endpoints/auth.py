@@ -1,7 +1,9 @@
 from datetime import timedelta
 from typing import Any
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
+from jose import jwt, JWTError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -45,6 +47,24 @@ async def refresh_token(
     refresh_token: str,
     db: AsyncSession = Depends(get_db)
 ) -> Any:
-    # TODO: Validate refresh token and issue new pair
-    # For MVP we can just verify JWT signature of refresh token
-    pass 
+    try:
+        payload = jwt.decode(refresh_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        if payload.get("type") != "refresh":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid token type")
+        sub = payload.get("sub")
+        if sub is None:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid token")
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid or expired refresh token")
+
+    result = await db.execute(select(User).where(User.id == uuid.UUID(sub)))
+    user = result.scalars().first()
+    if not user or not user.is_active:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    return {
+        "access_token": security.create_access_token(user.id, expires_delta=access_token_expires),
+        "token_type": "bearer",
+        "refresh_token": security.create_refresh_token(user.id),
+    }

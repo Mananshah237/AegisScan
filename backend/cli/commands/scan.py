@@ -60,12 +60,18 @@ def list_scans(limit: int = 10):
         console.print(f"[red]Error: {e}[/red]")
 
 @app.command("run")
-def run_scan(target_url: str, profile: str = "quick", wait: bool = False):
+def run_scan(
+    target_url: str,
+    profile: str = "quick",
+    wait: bool = False,
+    api_url: Optional[str] = typer.Option(None, "--api-url", help="AegisScan API URL (overrides config/env)"),
+    api_key: Optional[str] = typer.Option(None, "--api-key", help="AegisScan API key (overrides config/env)"),
+):
     """
     Trigger a new scan for a target URL.
     """
-    api_key = get_api_key()
-    base_url = get_api_url()
+    api_key = api_key or get_api_key()
+    base_url = api_url or get_api_url()
     headers = {"X-API-Key": api_key}
     
     # 1. Ensure Target Exists

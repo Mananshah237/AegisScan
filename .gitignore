@@ -45,3 +45,8 @@ docker-compose.override.yml
 artifacts/
 reports/
 logs/
+scan-results-*.json
+
+# Claude Code internal
+.claude/
+CLAUDE.md
