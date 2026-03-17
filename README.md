@@ -14,16 +14,18 @@
 1. [What is AegisScan](#what-is-aegisscan)
 2. [Architecture](#architecture)
 3. [Features](#features)
-4. [Prerequisites](#prerequisites)
-5. [First-Time Setup](#first-time-setup)
-6. [Everyday Usage](#everyday-usage)
-7. [Running Scans](#running-scans)
-8. [Understanding Results](#understanding-results)
-9. [Configuration Reference](#configuration-reference)
-10. [API Reference](#api-reference)
-11. [CI/CD Integration](#cicd-integration)
-12. [Troubleshooting](#troubleshooting)
-13. [Windows-Specific Notes](#windows-specific-notes)
+4. [Security Methodology](#security-methodology)
+5. [Prerequisites](#prerequisites)
+6. [First-Time Setup](#first-time-setup)
+7. [Everyday Usage](#everyday-usage)
+8. [Running Scans](#running-scans)
+9. [Understanding Results](#understanding-results)
+10. [OWASP Top 10 Mapping](#owasp-top-10-mapping)
+11. [Configuration Reference](#configuration-reference)
+12. [API Reference](#api-reference)
+13. [CI/CD Integration](#cicd-integration)
+14. [Troubleshooting](#troubleshooting)
+15. [Windows-Specific Notes](#windows-specific-notes)
 
 ---
 
@@ -112,6 +114,57 @@ It is well-suited for:
 - **Async pipeline** — FastAPI + Celery + Redis keeps the API responsive while scans run in the background
 - **CI/CD ready** — GitHub Actions workflow included for automated scanning on push/PR
 - **Self-hosted** — All data stays on your infrastructure; no third-party services required
+
+---
+
+## Security Methodology
+
+### What is DAST and how does it differ from SAST and SCA?
+
+Application security testing falls into three complementary categories, each catching a different class of defect at a different stage of the development lifecycle:
+
+| Approach | Full Name | When It Runs | What It Analyzes | Strengths | Blind Spots |
+|----------|-----------|-------------|------------------|-----------|-------------|
+| **SAST** | Static Application Security Testing | At build time, against source code | Source code, bytecode, or binaries | Finds issues early; no running application needed; can trace data flow through code paths | High false-positive rate; cannot detect runtime configuration issues or server-level misconfigurations |
+| **SCA** | Software Composition Analysis | At build time, against dependency manifests | Third-party libraries and their known CVEs | Catches vulnerable dependencies before deployment; integrates with package managers | Only finds *known* vulnerabilities in *declared* dependencies; cannot detect logic flaws or misconfigurations |
+| **DAST** | Dynamic Application Security Testing | At runtime, against a live application | HTTP requests and responses from the outside in | Finds real, exploitable issues as an attacker would see them; zero false positives on confirmed findings; language- and framework-agnostic | Slower than static analysis; requires a running target; coverage depends on crawl depth and authentication configuration |
+
+AegisScan is a **DAST** platform. It treats the target application as a black box, probing it over HTTP the same way an external attacker would. This means the findings it produces reflect actual exploitable behavior, not theoretical code paths.
+
+### Why automated DAST scanning matters in CI/CD pipelines
+
+Manual penetration tests happen once or twice a year. Between those engagements, teams ship dozens or hundreds of releases, each potentially introducing new endpoints, parameters, or configuration changes. Automated DAST scanning closes that gap by running on every deployment or on a recurring schedule, providing continuous assurance that:
+
+- **New endpoints are tested as soon as they exist** — A CI/CD-triggered scan catches missing security headers, exposed debug endpoints, or injection points within minutes of deployment to staging.
+- **Regressions are caught immediately** — A vulnerability that was fixed in sprint 12 and accidentally reintroduced in sprint 15 is flagged before it reaches production.
+- **Security gates enforce minimum standards** — Pipelines can fail the build if a scan returns any High-severity findings, preventing insecure code from being promoted.
+- **Evidence is generated automatically** — Compliance frameworks (SOC 2, PCI DSS, ISO 27001) require documented proof of regular security testing. Automated scan reports satisfy this requirement without manual effort.
+- **Developer feedback loops stay short** — When a developer gets a finding within minutes of pushing code, they still have full context on what they changed and why, making remediation faster and cheaper than findings discovered weeks later.
+
+### What types of vulnerabilities does ZAP find?
+
+OWASP ZAP, the scanning engine behind AegisScan, tests for a broad range of web application vulnerabilities across both its passive and active scan modes:
+
+**Passive scan findings** (observed without sending attack traffic):
+- Missing or misconfigured security headers (Content-Security-Policy, X-Frame-Options, Strict-Transport-Security, Permissions-Policy, CORP/COEP/COOP)
+- Insecure cookie attributes (missing `Secure`, `HttpOnly`, or `SameSite` flags)
+- Information leakage in HTTP responses (server version banners, stack traces, internal IP addresses)
+- Mixed content and insecure resource loading
+- Missing Subresource Integrity (SRI) on third-party scripts
+- Sensitive data transmitted in URL query parameters
+
+**Active scan findings** (discovered by sending crafted payloads):
+- **SQL Injection (SQLi)** — Payloads injected into parameters to detect database query manipulation, including error-based, blind boolean, and time-based variants
+- **Cross-Site Scripting (XSS)** — Reflected and stored XSS via script injection in input fields, URL parameters, and HTTP headers
+- **Cross-Site Request Forgery (CSRF)** — Missing or ineffective anti-CSRF tokens on state-changing forms
+- **Server-Side Request Forgery (SSRF)** — Attempts to make the server issue requests to internal resources
+- **Path Traversal / Local File Inclusion** — Directory traversal payloads to access files outside the web root
+- **Remote Code Execution (RCE)** — OS command injection and expression language injection
+- **XML External Entity (XXE)** — Malicious XML payloads targeting parsers that process external entities
+- **Security Misconfiguration** — Default credentials, unnecessary HTTP methods enabled, directory listings, verbose error pages
+- **Broken Authentication indicators** — Weak session identifiers, session fixation, and credential exposure
+
+The `quick` profile runs only passive checks and completes in 1-3 minutes. The `full` profile runs both passive and active checks, providing comprehensive coverage at the cost of longer scan times (20-60 minutes) and active attack traffic sent to the target.
 
 ---
 
@@ -422,6 +475,56 @@ This is a verified real-world result from the quick scan profile:
 | Low           | 7     | COEP/COOP/CORP headers missing, Permissions-Policy, HSTS, X-Content-Type-Options |
 | Informational | 4     | Cache-control header, sensitive info in URL, modern web app detection |
 | **Total**     | **14**|                                                                       |
+
+### Detailed sample findings
+
+The table below shows individual findings from the scan above with their full classification, including risk scores, OWASP Top 10 mapping, and CWE references:
+
+| Finding | Severity | Confidence | Risk Score | OWASP Category | CWE |
+|---------|----------|------------|------------|----------------|-----|
+| Content Security Policy (CSP) Header Not Set | Medium | High | 5.0 | A05:2021 Security Misconfiguration | CWE-693: Protection Mechanism Failure |
+| Missing Anti-clickjacking Header | Medium | Medium | 4.0 | A05:2021 Security Misconfiguration | CWE-1021: Improper Restriction of Rendered UI Layers |
+| Sub Resource Integrity Attribute Missing | Medium | High | 5.0 | A08:2021 Software and Data Integrity Failures | CWE-345: Insufficient Verification of Data Authenticity |
+| Cross-Origin Embedder Policy (COEP) Header Missing | Low | Medium | 1.6 | A05:2021 Security Misconfiguration | CWE-693: Protection Mechanism Failure |
+| Cross-Origin Opener Policy (COOP) Header Missing | Low | Medium | 1.6 | A05:2021 Security Misconfiguration | CWE-693: Protection Mechanism Failure |
+| Cross-Origin Resource Policy (CORP) Header Missing | Low | Medium | 1.6 | A05:2021 Security Misconfiguration | CWE-693: Protection Mechanism Failure |
+| Permissions-Policy Header Not Set | Low | Medium | 1.6 | A05:2021 Security Misconfiguration | CWE-693: Protection Mechanism Failure |
+| Strict-Transport-Security Header Not Set | Low | High | 2.0 | A05:2021 Security Misconfiguration | CWE-319: Cleartext Transmission of Sensitive Information |
+| X-Content-Type-Options Header Missing | Low | Medium | 1.6 | A05:2021 Security Misconfiguration | CWE-693: Protection Mechanism Failure |
+| Server Leaks Information via "X-Powered-By" Header | Low | Medium | 1.6 | A05:2021 Security Misconfiguration | CWE-200: Exposure of Sensitive Information |
+| Cache-control Header Not Set | Informational | Medium | 0.4 | A05:2021 Security Misconfiguration | CWE-525: Use of Web Browser Cache Containing Sensitive Information |
+| Information Disclosure - Sensitive Information in URL | Informational | Medium | 0.4 | A02:2021 Cryptographic Failures | CWE-200: Exposure of Sensitive Information |
+| Modern Web Application Detected | Informational | Medium | 0.4 | — | — |
+| Non-Storable Content | Informational | Medium | 0.4 | — | CWE-524: Use of Cache That Contains Sensitive Information |
+
+> **Note**: Risk scores are computed using the formula `severity_weight x confidence_weight` described above. Informational findings with no direct security impact are not mapped to an OWASP category.
+
+---
+
+## OWASP Top 10 Mapping
+
+AegisScan findings map directly to the [OWASP Top 10 (2021)](https://owasp.org/Top10/) categories. This mapping helps teams prioritize remediation by industry-standard risk classification and satisfies compliance requirements that reference the OWASP Top 10.
+
+| AegisScan Finding Category | OWASP Top 10 Category | OWASP ID | Common CWEs | Example Findings |
+|---|---|---|---|---|
+| SQL Injection | Injection | A03:2021 | CWE-89, CWE-564 | SQL injection via URL parameters, blind SQL injection in form fields |
+| Cross-Site Scripting (XSS) | Injection | A03:2021 | CWE-79, CWE-80 | Reflected XSS in search parameters, stored XSS in user input fields |
+| Command Injection | Injection | A03:2021 | CWE-78, CWE-77 | OS command injection via unsanitized input, expression language injection |
+| XML External Entity (XXE) | Injection | A03:2021 | CWE-611 | External entity processing in XML parsers |
+| Cross-Site Request Forgery (CSRF) | Broken Access Control | A01:2021 | CWE-352 | Missing anti-CSRF tokens on state-changing forms, predictable token values |
+| Path Traversal / LFI | Broken Access Control | A01:2021 | CWE-22, CWE-98 | Directory traversal to access `/etc/passwd`, local file inclusion |
+| Server-Side Request Forgery (SSRF) | Server-Side Request Forgery | A10:2021 | CWE-918 | Internal network scanning via URL parameters, cloud metadata endpoint access |
+| Sensitive Data in URL | Cryptographic Failures | A02:2021 | CWE-200, CWE-319 | Session tokens in query strings, credentials in URL parameters |
+| Missing HSTS Header | Cryptographic Failures | A02:2021 | CWE-319 | Strict-Transport-Security not set, allowing protocol downgrade attacks |
+| Weak Session Management | Identification and Authentication Failures | A07:2021 | CWE-384, CWE-613 | Session fixation, insufficient session expiration, weak session IDs |
+| Missing Security Headers | Security Misconfiguration | A05:2021 | CWE-693, CWE-1021 | CSP not set, X-Frame-Options missing, Permissions-Policy absent |
+| Directory Listing Enabled | Security Misconfiguration | A05:2021 | CWE-548 | Web server directory indexing exposes file structure |
+| Server Version Disclosure | Security Misconfiguration | A05:2021 | CWE-200 | X-Powered-By header, Server header exposing version info |
+| Vulnerable JavaScript Libraries | Vulnerable and Outdated Components | A06:2021 | CWE-1104 | Outdated jQuery, known-vulnerable frontend dependencies |
+| Sub Resource Integrity Missing | Software and Data Integrity Failures | A08:2021 | CWE-345 | Third-party scripts loaded without SRI hash verification |
+| Insufficient Logging Indicators | Security Logging and Monitoring Failures | A09:2021 | CWE-778 | Missing error handling, absent security event logging |
+
+> **Coverage note**: The `quick` scan profile primarily surfaces findings in A02, A05, and A06. The `full` scan profile extends coverage across all ten categories, including active testing for A01, A03, A07, and A10.
 
 ---
 
