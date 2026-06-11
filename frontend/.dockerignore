@@ -1,0 +1,8 @@
+# Never copy host-installed deps/build output into the image — they contain
+# platform-specific native binaries (esbuild/rollup) that break the Linux build.
+node_modules
+dist
+.git
+*.log
+.env
+.env.*

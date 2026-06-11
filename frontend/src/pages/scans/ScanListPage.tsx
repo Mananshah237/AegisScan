@@ -1,88 +1,91 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '@/lib/api';
-import { Loader2 } from 'lucide-react';
+import { ScanLine, ChevronRight } from 'lucide-react';
+import { PageHeader, Card, Spinner, EmptyState, Badge, Button } from '@/components/ui';
+import { cn } from '@/lib/utils';
 
 interface Scan {
-    id: string;
-    target_id: string;
-    status: string;
-    profile: string;
-    created_at: string;
-    target: {
-        name: string;
-        base_url: string;
-    }
+  id: string;
+  target_id: string;
+  status: string;
+  profile: string;
+  created_at: string;
+  target?: { name: string; base_url: string };
+}
+
+function statusClasses(status: string) {
+  const s = (status || '').toLowerCase();
+  if (s.includes('complet')) return 'bg-ok/15 text-ok border-ok/30';
+  if (s.includes('fail')) return 'bg-crit/15 text-crit border-crit/30';
+  if (s.includes('run') || s.includes('progress')) return 'bg-accent/15 text-accent border-accent/30';
+  return 'bg-medium/15 text-medium border-medium/30';
 }
 
 export default function ScanListPage() {
-    const [scans, setScans] = useState<Scan[]>([]);
-    const [loading, setLoading] = useState(true);
+  const [scans, setScans] = useState<Scan[]>([]);
+  const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        const fetchScans = async () => {
-            try {
-                const response = await api.get('/scans/');
-                setScans(response.data);
-            } catch (error) {
-                console.error(error);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchScans();
-    }, []);
+  useEffect(() => {
+    api
+      .get('/scans/')
+      .then((r) => setScans(r.data))
+      .catch((e) => console.error(e))
+      .finally(() => setLoading(false));
+  }, []);
 
-    if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>;
+  if (loading) return <Spinner />;
 
-    return (
-        <div className="max-w-7xl mx-auto px-4 py-8">
-            <h1 className="text-2xl font-bold">Scans</h1>
-            <p className="text-gray-600">Scan history and status.</p>
+  return (
+    <div>
+      <PageHeader title="Scans" subtitle="Scan history and live status." />
 
-            <div className="mt-8">
-                {scans.length === 0 ? (
-                    <p>No scans found. Go to <Link to="/targets" className="text-indigo-600 underline">Targets</Link> to start a new scan.</p>
-                ) : (
-                    <div className="bg-white shadow overflow-hidden sm:rounded-md">
-                        <ul className="divide-y divide-gray-200">
-                            {scans.map(scan => (
-                                <li key={scan.id}>
-                                    <Link to={`/scans/${scan.id}`} className="block hover:bg-gray-50">
-                                        <div className="px-4 py-4 sm:px-6">
-                                            <div className="flex items-center justify-between">
-                                                <p className="text-sm font-medium text-indigo-600 truncate">
-                                                    {scan.target?.name || 'Unknown Target'}
-                                                </p>
-                                                <div className="ml-2 flex-shrink-0 flex">
-                                                    <p className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${scan.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
-                                                            scan.status === 'FAILED' ? 'bg-red-100 text-red-800' :
-                                                                'bg-yellow-100 text-yellow-800'
-                                                        }`}>
-                                                        {scan.status}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <div className="mt-2 sm:flex sm:justify-between">
-                                                <div className="sm:flex">
-                                                    <p className="flex items-center text-sm text-gray-500">
-                                                        {scan.target?.base_url}
-                                                    </p>
-                                                </div>
-                                                <div className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0">
-                                                    <p>
-                                                        Scan ID: {scan.id.slice(0, 8)}...
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </Link>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                )}
-            </div>
-        </div>
-    );
+      {scans.length === 0 ? (
+        <EmptyState
+          icon={<ScanLine className="h-8 w-8" />}
+          title="No scans yet"
+          description="Pick a target and launch a scan to populate your history."
+          action={
+            <Link to="/targets">
+              <Button variant="outline">Go to Targets</Button>
+            </Link>
+          }
+        />
+      ) : (
+        <Card className="divide-y divide-line/50">
+          {scans.map((scan) => (
+            <Link
+              key={scan.id}
+              to={`/scans/${scan.id}`}
+              className="flex items-center justify-between gap-4 px-5 py-4 transition-colors hover:bg-surface-2/40"
+            >
+              <div className="min-w-0">
+                <div className="flex items-center gap-3">
+                  <p className="truncate font-medium text-fg">
+                    {scan.target?.name || 'Unknown target'}
+                  </p>
+                  <span
+                    className={cn(
+                      'rounded-md border px-2 py-0.5 text-xs font-semibold uppercase tracking-wide',
+                      statusClasses(scan.status),
+                    )}
+                  >
+                    {scan.status}
+                  </span>
+                </div>
+                <p className="mt-1 truncate font-mono text-xs text-muted">
+                  {scan.target?.base_url}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-3">
+                {scan.profile && <Badge>{scan.profile}</Badge>}
+                <span className="font-mono text-xs text-muted">{scan.id.slice(0, 8)}</span>
+                <ChevronRight className="h-4 w-4 text-muted" />
+              </div>
+            </Link>
+          ))}
+        </Card>
+      )}
+    </div>
+  );
 }

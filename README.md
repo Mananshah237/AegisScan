@@ -55,6 +55,50 @@ It is well-suited for:
 
 ---
 
+## Quick Start (verified)
+
+```bash
+docker compose up -d --build      # starts db, redis, backend, worker, frontend
+# Frontend:  http://localhost:3001
+# API docs:  http://localhost:8001/docs
+```
+
+**Ports:** the web UI is on **3001** and the API on **8001** (Postgres/Redis are
+internal-only, with no host ports) so AegisScan can run at the same time as the other
+projects — VEXIS (3000/8000) and PhishNet (3002/8002). The first ZAP scan pulls
+`ghcr.io/zaproxy/zaproxy:stable` (~1.5 GB) on demand.
+
+### Sample login
+
+A ready-to-use account is seeded for evaluation:
+
+| Email | Password |
+|-------|----------|
+| `analyst@aegisscan.io` | `Aegis@Scan2026` |
+
+**Where the login is stored:** user accounts live in **PostgreSQL** (database `autoappsec`, table `users`), with passwords hashed using **bcrypt** (`app/core/security.py`). The data persists in the Docker named volume `postgres_data`, so it survives `docker compose down`/`up` (but not `down -v`). After login, the browser holds a **JWT access token + refresh token in `localStorage`** (`aegis_access_token` / `aegis_refresh_token`); the API validates the bearer token on every request and the SPA auto-refreshes via `/api/v1/auth/refresh` on a `401`.
+
+To create more users: the **Sign up** page, or `POST /api/v1/users/signup` with `{"email","password"}` (note: e-mail validation rejects reserved TLDs like `.local`).
+
+### Recent fixes & additions
+
+- **Frontend now builds.** `frontend/src/lib/` (`api.ts`, `utils.ts`) was missing because a broad `lib/` rule in `.gitignore` (intended for Python) also excluded the React source folder — so the modules every page imports were never committed. The rule is now scoped to `/backend/`, and the files are restored.
+- **Complete UI redesign** — a dark "security console" theme with a persistent sidebar shell (`components/AppLayout.tsx`), a small reusable UI kit (`components/ui.tsx`: cards, severity badges, stat cards, buttons, inputs), a redesigned dashboard (area-chart trends), targets, scans, an expandable findings view with severity summary and risk bars, and branded auth pages. Tailwind was also migrated to the v4 entry syntax (`@import "tailwindcss"`).
+- **ZAP scans actually return results.** `HOST_ARTIFACTS_PATH` in `docker-compose.yml` pointed at a non-existent path (`…/Downloads/AegisScan/…` instead of `…/Downloads/projects/AegisScan/…`). Because the worker launches ZAP as a *sibling* container that bind-mounts that host path, every scan's report landed where the worker couldn't read it. Fixed and verified end-to-end (a quick scan of `https://example.com` produced 11 parsed findings).
+
+## Optimization & improvement roadmap
+
+These are concrete, prioritized next steps (and how to implement them):
+
+1. **Code-split the frontend bundle** (~740 KB). `recharts` dominates. Add `build.rollupOptions.output.manualChunks` in `vite.config.ts` to split vendor/charts, or lazy-load chart pages with `React.lazy`.
+2. **SSRF allow-list enforcement on scan targets.** `app/core/ssrf.py` exists — wire it into `targets`/`scans` creation so private IPs/metadata endpoints can't be targeted, and surface validation errors in the UI.
+3. **Live scan progress.** Scans are async but the UI only polls on load. Add a status badge with polling (or SSE/WebSocket from the worker) on the Scans page so a running scan updates without refresh.
+4. **Findings filtering & pagination.** As scans accumulate, add server-side filtering by severity/scan and pagination to `GET /findings`.
+5. **Seed/bootstrap script.** Add a `make seed` (or `backend/create_tables.py --seed`) that creates the sample user and a demo target so a fresh clone is immediately demoable.
+6. **Pin the ZAP image by digest** in `runner.py` for reproducible, supply-chain-safe scans.
+
+---
+
 ## Architecture
 
 ```

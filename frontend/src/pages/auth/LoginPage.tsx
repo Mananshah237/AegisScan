@@ -5,89 +5,123 @@ import { z } from 'zod';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
-import { Loader2 } from 'lucide-react';
+import { ShieldCheck, Zap, Lock, Activity } from 'lucide-react';
+import { Button, Input, Field } from '@/components/ui';
 
 const loginSchema = z.object({
-    username: z.string().email(),
-    password: z.string().min(1, 'Password is required'),
+  username: z.string().email('Enter a valid email'),
+  password: z.string().min(1, 'Password is required'),
 });
-
 type LoginForm = z.infer<typeof loginSchema>;
 
+const features = [
+  { icon: Zap, title: 'Automated DAST', text: 'Orchestrated OWASP ZAP scans on demand.' },
+  { icon: Activity, title: 'Risk scoring', text: 'Every finding scored, deduplicated, tracked.' },
+  { icon: Lock, title: 'Self-hosted', text: 'Your targets and data never leave your infra.' },
+];
+
 export default function LoginPage() {
-    const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false);
-    const { login } = useAuth();
-    const navigate = useNavigate();
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { login } = useAuth();
+  const navigate = useNavigate();
 
-    const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>({
-        resolver: zodResolver(loginSchema)
-    });
+  const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>({
+    resolver: zodResolver(loginSchema),
+  });
 
-    const onSubmit = async (data: LoginForm) => {
-        setLoading(true);
-        setError('');
-        try {
-            const params = new URLSearchParams();
-            params.append('username', data.username);
-            params.append('password', data.password);
+  const onSubmit = async (data: LoginForm) => {
+    setLoading(true);
+    setError('');
+    try {
+      const params = new URLSearchParams();
+      params.append('username', data.username);
+      params.append('password', data.password);
+      const response = await api.post('/auth/access-token', params, {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      });
+      login(response.data.access_token, response.data.refresh_token);
+      navigate('/dashboard');
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Login failed');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-            const response = await api.post('/auth/access-token', params);
-
-            login(response.data.access_token, response.data.refresh_token);
-            navigate('/dashboard');
-        } catch (err: any) {
-            setError(err.response?.data?.detail || 'Login failed');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    return (
-        <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
-            <div className="w-full max-w-md space-y-8">
-                <div>
-                    <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">Sign in to AutoAppSec</h2>
-                    <p className="mt-2 text-center text-sm text-gray-600">
-                        Or <Link to="/signup" className="font-medium text-indigo-600 hover:text-indigo-500">start your 14-day free trial</Link>
-                    </p>
-                </div>
-                <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
-                    <div className="-space-y-px rounded-md shadow-sm">
-                        <div>
-                            <input
-                                {...register('username')}
-                                type="email"
-                                className="relative block w-full rounded-t-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 px-3"
-                                placeholder="Email address"
-                            />
-                            {errors.username && <p className="text-red-500 text-xs mt-1">{errors.username.message}</p>}
-                        </div>
-                        <div>
-                            <input
-                                {...register('password')}
-                                type="password"
-                                className="relative block w-full rounded-b-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 px-3"
-                                placeholder="Password"
-                            />
-                            {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password.message}</p>}
-                        </div>
-                    </div>
-
-                    {error && <div className="text-red-500 text-sm text-center">{error}</div>}
-
-                    <div>
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="group relative flex w-full justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50"
-                        >
-                            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Sign in
-                        </button>
-                    </div>
-                </form>
-            </div>
+  return (
+    <div className="relative z-10 grid min-h-screen lg:grid-cols-2">
+      {/* Brand panel */}
+      <div className="relative hidden flex-col justify-between overflow-hidden border-r border-line-soft p-12 lg:flex">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-sky-400 to-indigo-500 text-[#04141f] shadow-lg shadow-sky-500/30">
+            <ShieldCheck className="h-5 w-5" />
+          </div>
+          <span className="text-lg font-bold tracking-tight">AegisScan</span>
         </div>
-    );
+
+        <div className="max-w-md">
+          <h2 className="text-4xl font-extrabold leading-tight tracking-tight text-gradient">
+            Ship secure web apps, without the SaaS bill.
+          </h2>
+          <p className="mt-4 text-sm leading-relaxed text-muted">
+            A self-hosted dynamic application security testing console — authenticated
+            scanning, risk-scored findings, and reports, all on your own infrastructure.
+          </p>
+          <div className="mt-9 space-y-4">
+            {features.map((f) => (
+              <div key={f.title} className="flex items-start gap-3">
+                <div className="mt-0.5 rounded-lg bg-surface-2/70 p-2 text-accent ring-1 ring-inset ring-line">
+                  <f.icon className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-fg">{f.title}</p>
+                  <p className="text-xs text-muted">{f.text}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <p className="text-xs text-faint">Powered by OWASP ZAP · FastAPI · React</p>
+      </div>
+
+      {/* Form panel */}
+      <div className="flex items-center justify-center px-4 py-12">
+        <div className="w-full max-w-sm animate-fade-up">
+          <div className="mb-8 text-center lg:hidden">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-sky-400 to-indigo-500 text-[#04141f]">
+              <ShieldCheck className="h-6 w-6" />
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight">AegisScan</h1>
+          </div>
+
+          <h1 className="text-2xl font-bold tracking-tight text-fg">Welcome back</h1>
+          <p className="mt-1 mb-7 text-sm text-muted">Sign in to your security console.</p>
+
+          <form className="space-y-5" onSubmit={handleSubmit(onSubmit)}>
+            <Field label="Email" error={errors.username?.message}>
+              <Input type="email" placeholder="you@example.com" autoFocus {...register('username')} />
+            </Field>
+            <Field label="Password" error={errors.password?.message}>
+              <Input type="password" placeholder="••••••••" {...register('password')} />
+            </Field>
+
+            {error && (
+              <div className="rounded-xl border border-crit/30 bg-crit/10 px-3 py-2 text-sm text-crit">
+                {error}
+              </div>
+            )}
+
+            <Button type="submit" className="w-full" loading={loading}>Sign in</Button>
+          </form>
+
+          <p className="mt-6 text-center text-sm text-muted">
+            No account?{' '}
+            <Link to="/signup" className="font-semibold text-accent hover:underline">Create one</Link>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
 }

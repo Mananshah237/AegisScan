@@ -8,14 +8,16 @@ import ScanListPage from '@/pages/scans/ScanListPage';
 import ScanResultsPage from '@/pages/scans/ScanResultsPage';
 import DashboardPage from '@/pages/dashboard/DashboardPage';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
+import AppLayout from '@/components/AppLayout';
+import { Spinner } from '@/components/ui';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
 
-  if (isLoading) return <div>Loading...</div>;
+  if (isLoading) return <Spinner className="min-h-screen" />;
   if (!user) return <Navigate to="/login" replace />;
 
-  return <>{children}</>;
+  return <AppLayout>{children}</AppLayout>;
 }
 
 function AppRoutes() {

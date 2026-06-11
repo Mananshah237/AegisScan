@@ -8,8 +8,7 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=autoappsec
-    ports:
-      - "5432:5432"
+    # Internal-only (no host port) so multiple project stacks can run side by side.
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -19,8 +18,7 @@ services:
   redis:
     image: redis:7-alpine
     restart: always
-    ports:
-      - "6379:6379"
+    # Internal-only (no host port) so multiple project stacks can run side by side.
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -40,9 +38,9 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - SECRET_KEY=changethisdevsecret
-      - BACKEND_CORS_ORIGINS=["http://localhost:3000"]
+      - BACKEND_CORS_ORIGINS=["http://localhost:3001"]
     ports:
-      - "8000:8000"
+      - "8001:8000"
     depends_on:
       db:
         condition: service_healthy
@@ -64,7 +62,11 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - SECRET_KEY=changethisdevsecret
-      - HOST_ARTIFACTS_PATH=C:/Users/mgroc/Downloads/AegisScan/backend/artifacts
+      # Real host path to ./backend/artifacts. The worker spawns ZAP as a SIBLING
+      # container via the Docker socket, so this must be the host path (not a path
+      # inside the worker) for the bind mount of ZAP's /zap/wrk to line up with
+      # the directory the worker reads reports back from.
+      - HOST_ARTIFACTS_PATH=C:/Users/mgroc/Downloads/projects/AegisScan/backend/artifacts
     depends_on:
       db:
         condition: service_healthy
@@ -76,14 +78,12 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        # Vite bakes this at build time; points the SPA at the backend's host port.
+        VITE_API_URL: http://localhost:8001
     restart: always
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
     ports:
-      - "3000:80"
-    environment:
-      - VITE_API_URL=http://localhost:8000
+      - "3001:80"
     depends_on:
       - backend
 

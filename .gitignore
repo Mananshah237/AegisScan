@@ -11,8 +11,10 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+# NOTE: scope these Python build-artifact dirs to the backend so they do NOT
+# match the frontend source folder frontend/src/lib (which broke the build).
+/backend/lib/
+/backend/lib64/
 parts/
 sdist/
 var/
@@ -50,3 +52,7 @@ scan-results-*.json
 # Claude Code internal
 .claude/
 CLAUDE.md
+
+# Ensure frontend source is always tracked (guards against the broad lib/ rule)
+!frontend/src/lib/
+!frontend/src/lib/**
